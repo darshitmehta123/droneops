@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — Assign Drones</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <div class="section-header">
+        <div class="section-title">Assign Drones to Orders</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:12px;color:var(--text2);">
+            Showing <span style="color:var(--amber);">pending</span>
+            and <span style="color:var(--accent);">confirmed</span> orders only
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- loading state -->
+      <div id="loading" style="text-align:center;padding:48px;color:var(--text2);font-family:var(--mono);font-size:13px;">
+        Loading orders and drones...
+      </div>
+
+      <div id="assign-list" style="display:none;"></div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('assign');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('Assign Drones');
+
+// Viewer cannot assign drones
+if (!can('orders','update')) {
+  document.getElementById('assign-list').innerHTML = `
+    <div style="text-align:center;padding:60px 20px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:14px;">
+      <div style="font-size:40px;margin-bottom:16px;opacity:.3;">🔒</div>
+      <div style="font-family:var(--mono);font-size:15px;color:var(--text2);margin-bottom:8px;">Access Restricted</div>
+      <div style="font-size:13px;color:var(--text3);">Your role <b style="color:var(--amber);">${getRole()}</b> does not have permission to assign drones or dispatch orders.</div>
+    </div>`;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('assign-list').style.display = 'block';
+} else {
+  loadData();
+}
+
+// ── STATE ──
+let orders = [];
+let drones = [];
+let hubs   = [];
+let customers = [];
+
+// ── LOAD ALL DATA FROM API ──
+async function loadData() {
+  document.getElementById('loading').style.display  = 'block';
+  document.getElementById('assign-list').style.display = 'none';
+  try {
+    [orders, drones, hubs, customers] = await Promise.all([
+      GET('/orders'),
+      GET('/drones'),
+      GET('/hubs'),
+      GET('/customers'),
+    ]);
+    logSQL(`SELECT o.*, c.full_name, h.hub_name FROM "order" o\nJOIN customer c ON c.customer_id = o.customer_id\nJOIN hub h ON h.hub_id = o.hub_id\nWHERE o.status IN ('pending','confirmed')\nORDER BY o.placed_at DESC;`);
+    render();
+  } catch (err) {
+    document.getElementById('loading').innerHTML =
+      `<div class="empty"><div class="empty-icon">❌</div><div class="empty-text">Failed to load data. Is the server running?</div></div>`;
+  }
+}
+
+// ── RENDER ASSIGN CARDS ──
+function render() {
+  document.getElementById('loading').style.display     = 'none';
+  document.getElementById('assign-list').style.display = 'block';
+
+  const assignable = orders.filter(o => ['pending', 'confirmed'].includes(o.status));
+  const el = document.getElementById('assign-list');
+
+  if (!assignable.length) {
+    el.innerHTML = `<div class="empty">
+      <div class="empty-icon">✅</div>
+      <div class="empty-text">All active orders have been dispatched or delivered.</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = assignable.map(o => {
+    const customer  = customers.find(c => c.customer_id === o.customer_id) || {};
+    const hub       = hubs.find(h => h.hub_id === o.hub_id) || {};
+
+    // Available drones — prefer same hub, fallback to any hub
+    const availAll  = drones.filter(d => d.status === 'available');
+    const hubDrones = availAll.filter(d => d.hub_id === o.hub_id);
+    const droneList = hubDrones.length ? hubDrones : availAll;
+
+    const assignedDrone = o.assigned_drone_id
+      ? drones.find(d => d.drone_id === o.assigned_drone_id)
+      : null;
+
+    return `
+    <div class="assign-card" id="card-${o.order_id}">
+
+      <!-- CARD HEADER -->
+      <div class="assign-card-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <span class="mono" style="color:var(--accent);font-size:13px;font-weight:700;">
+              #${o.order_id}
+            </span>
+            ${statusBadge(o.status)}
+          </div>
+          <div class="assign-card-info">
+            👤 <b>${o.customer_name || customer.full_name || '—'}</b>
+            &nbsp;·&nbsp;
+            🏭 <b>${o.hub_name || hub.hub_name || '—'}</b>
+            &nbsp;·&nbsp;
+            ⚖️ ${o.total_weight_kg} kg
+            &nbsp;·&nbsp;
+            💰 ₹${o.total_price}
+          </div>
+          <div style="margin-top:5px;font-size:11px;color:var(--text3);">
+            📅 Placed: ${new Date(o.placed_at).toLocaleString()}
+            ${o.delivery_address ? `&nbsp;·&nbsp; 📍 ${o.delivery_address}` : ''}
+          </div>
+        </div>
+
+        <!-- ASSIGNED DRONE BADGE -->
+        <div>
+          ${assignedDrone
+            ? `<span class="badge badge-green">🚁 ${assignedDrone.serial_number}</span>`
+            : `<span class="badge badge-amber">No drone assigned</span>`}
+        </div>
+      </div>
+
+      <!-- DRONE SELECT + ACTION BUTTONS -->
+      <div class="drone-select-row">
+
+        <!-- Drone dropdown -->
+        <select class="form-select" id="sel-${o.order_id}" style="flex:1;max-width:380px;">
+          <option value="">— Select available drone —</option>
+          ${droneList.map(d => `
+            <option value="${d.drone_id}"
+              ${o.assigned_drone_id === d.drone_id ? 'selected' : ''}>
+              ${d.serial_number} · ${d.model} · ${d.current_battery_pct}% 🔋 · ${d.max_range_km}km range
+              ${d.hub_id === o.hub_id ? '✓ same hub' : ''}
+            </option>`).join('')}
+        </select>
+
+        <!-- ASSIGN BUTTON -->
+        <button
+          class="btn btn-primary btn-sm"
+          id="btn-assign-${o.order_id}"
+          onclick="assignDrone(${o.order_id})">
+          Assign
+        </button>
+
+        <!-- UNASSIGN BUTTON (only if drone assigned) -->
+        ${assignedDrone ? `
+          <button
+            class="btn btn-danger btn-sm"
+            id="btn-unassign-${o.order_id}"
+            onclick="unassignDrone(${o.order_id})">
+            Unassign
+          </button>` : ''}
+
+        <!-- DISPATCH BUTTON -->
+        <button
+          class="btn btn-green btn-sm"
+          id="btn-dispatch-${o.order_id}"
+          onclick="dispatchOrder(${o.order_id})"
+          ${!assignedDrone ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+          🚀 Mark Dispatched
+        </button>
+
+      </div>
+
+      <!-- Warning if no drones available -->
+      ${droneList.length === 0 ? `
+        <div style="margin-top:10px;font-size:12px;color:var(--red);font-family:var(--mono);">
+          ⚠ No available drones at this hub. All drones are busy or in maintenance.
+        </div>` : ''}
+
+    </div>`;
+  }).join('');
+}
+
+// ── ASSIGN DRONE → calls PUT /api/orders/:id/assign ──
+async function assignDrone(orderId) {
+  const sel     = document.getElementById('sel-' + orderId);
+  const droneId = parseInt(sel.value);
+
+  if (!droneId) {
+    toast('Please select a drone first', 'error');
+    return;
+  }
+
+  // Disable button while saving
+  const btn = document.getElementById('btn-assign-' + orderId);
+  btn.disabled    = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    await PUT(`/orders/${orderId}/assign`, { drone_id: droneId });
+
+    logSQL(`UPDATE "order"\nSET assigned_drone_id=${droneId}, status='confirmed', updated_at=NOW()\nWHERE order_id=${orderId};`);
+
+    toast('Drone assigned successfully ✓', 'success');
+    await loadData(); // reload everything from DB
+  } catch (err) {
+    btn.disabled    = false;
+    btn.textContent = 'Assign';
+  }
+}
+
+// ── UNASSIGN DRONE → calls PUT /api/orders/:id/assign with null ──
+async function unassignDrone(orderId) {
+  const btn = document.getElementById('btn-unassign-' + orderId);
+  btn.disabled    = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    await PUT(`/orders/${orderId}/assign`, { drone_id: null });
+
+    logSQL(`UPDATE "order"\nSET assigned_drone_id=NULL, updated_at=NOW()\nWHERE order_id=${orderId};`);
+
+    toast('Drone unassigned', 'info');
+    await loadData();
+  } catch (err) {
+    btn.disabled    = false;
+    btn.textContent = 'Unassign';
+  }
+}
+
+// ── DISPATCH ORDER → calls PUT /api/orders/:id/dispatch ──
+async function dispatchOrder(orderId) {
+  const btn = document.getElementById('btn-dispatch-' + orderId);
+  btn.disabled    = true;
+  btn.textContent = 'Dispatching...';
+
+  try {
+    await PUT(`/orders/${orderId}/dispatch`, {});
+
+    logSQL(`UPDATE "order" SET status='dispatched', updated_at=NOW() WHERE order_id=${orderId};\nUPDATE drone SET status='in-flight' WHERE drone_id=(\n  SELECT assigned_drone_id FROM "order" WHERE order_id=${orderId}\n);`);
+
+    toast('Order dispatched! Drone is now in-flight 🚁', 'success');
+    await loadData();
+  } catch (err) {
+    btn.disabled    = false;
+    btn.textContent = '🚀 Mark Dispatched';
+  }
+}
+
+// ── INIT handled above based on role ──
+</script>
+</body>
+</html>

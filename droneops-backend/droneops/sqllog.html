@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — SQL Log</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.log-card {
+  background:rgba(0,0,0,.25);
+  border:1px solid var(--border);
+  border-radius:var(--r2);
+  overflow:hidden;
+  margin-bottom:10px;
+  transition:border-color .15s ease;
+}
+.log-card:hover { border-color:var(--border2); }
+.log-card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:11px 16px;
+  background:rgba(0,0,0,.2);
+  border-bottom:1px solid var(--border);
+  gap:10px;
+}
+.log-num {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  color:var(--text3); letter-spacing:.5px; min-width:56px;
+}
+.log-ts {
+  font-family:var(--mono); font-size:11px; color:var(--text3);
+  flex:1;
+}
+.log-type-badge {
+  font-family:var(--mono); font-size:9px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase;
+  padding:2px 10px; border-radius:20px; border:1px solid;
+}
+.type-select { color:var(--accent);  background:rgba(0,212,255,.08);  border-color:rgba(0,212,255,.2); }
+.type-insert { color:var(--green);   background:rgba(0,230,118,.08);  border-color:rgba(0,230,118,.2); }
+.type-update { color:var(--amber);   background:rgba(255,171,64,.08); border-color:rgba(255,171,64,.2); }
+.type-delete { color:var(--red);     background:rgba(255,82,82,.08);  border-color:rgba(255,82,82,.2); }
+.copy-btn {
+  background:transparent; border:1px solid var(--border2);
+  color:var(--text3); font-family:var(--mono); font-size:10px;
+  padding:2px 10px; border-radius:5px; cursor:pointer;
+  transition:all .15s ease; white-space:nowrap;
+}
+.copy-btn:hover { border-color:var(--accent); color:var(--accent); }
+.copy-btn.copied { border-color:var(--green); color:var(--green); }
+.log-body { padding:14px 16px; }
+.log-sql {
+  font-family:var(--mono); font-size:12px; color:var(--text2);
+  line-height:2; white-space:pre-wrap; word-break:break-word;
+}
+.log-sql .kw  { color:var(--purple); font-weight:700; }
+.log-sql .val { color:var(--amber); }
+.log-sql .tbl { color:var(--accent); }
+
+/* filter bar */
+.filter-bar {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  background:rgba(0,0,0,.2); border:1px solid var(--border);
+  border-radius:var(--r2); padding:12px 16px; margin-bottom:20px;
+}
+.type-filter-btn {
+  padding:4px 14px; border-radius:20px; border:1px solid;
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+  background:transparent; transition:all .15s ease;
+}
+.type-filter-btn.active { box-shadow:0 0 8px rgba(0,0,0,.3); }
+
+/* empty state */
+.log-empty {
+  text-align:center; padding:60px 20px;
+  background:rgba(0,0,0,.2); border:1px solid var(--border);
+  border-radius:var(--r2);
+}
+.log-empty-icon { margin-bottom:16px; opacity:.3; }
+.log-empty-title { font-family:var(--mono); font-size:14px; color:var(--text2); margin-bottom:6px; }
+.log-empty-sub { font-size:12px; color:var(--text3); }
+
+/* stats row */
+.log-stat {
+  display:flex; flex-direction:column; align-items:center;
+  gap:2px; padding:8px 16px; border-right:1px solid var(--border);
+}
+.log-stat:last-child { border-right:none; }
+.log-stat-val { font-family:var(--mono); font-size:18px; font-weight:700; }
+.log-stat-lbl { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text3); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <!-- HEADER -->
+      <div class="section-header" style="margin-bottom:20px;">
+        <div class="section-title">SQL Execution Log</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="log-updated" style="font-family:var(--mono);font-size:11px;color:var(--text3);"></span>
+          <button class="btn btn-ghost btn-sm" onclick="render()">↻ Refresh</button>
+          <button class="btn btn-danger btn-sm" onclick="clearLog()">Clear Log</button>
+        </div>
+      </div>
+
+      <!-- STATS BAR -->
+      <div style="display:flex;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--r2);margin-bottom:20px;overflow:hidden;">
+        <div class="log-stat"><div class="log-stat-val" id="stat-total" style="color:var(--text);">0</div><div class="log-stat-lbl">Total</div></div>
+        <div class="log-stat"><div class="log-stat-val" id="stat-select" style="color:var(--accent);">0</div><div class="log-stat-lbl">SELECT</div></div>
+        <div class="log-stat"><div class="log-stat-val" id="stat-insert" style="color:var(--green);">0</div><div class="log-stat-lbl">INSERT</div></div>
+        <div class="log-stat"><div class="log-stat-val" id="stat-update" style="color:var(--amber);">0</div><div class="log-stat-lbl">UPDATE</div></div>
+        <div class="log-stat"><div class="log-stat-val" id="stat-delete" style="color:var(--red);">0</div><div class="log-stat-lbl">DELETE</div></div>
+      </div>
+
+      <!-- FILTER BAR -->
+      <div class="filter-bar">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-right:4px;">Filter:</span>
+        <button class="type-filter-btn active" id="filter-all"
+          style="color:var(--text2);border-color:var(--border2);"
+          onclick="setFilter('')">All</button>
+        <button class="type-filter-btn" id="filter-select"
+          style="color:var(--accent);border-color:rgba(0,212,255,.3);"
+          onclick="setFilter('select')">SELECT</button>
+        <button class="type-filter-btn" id="filter-insert"
+          style="color:var(--green);border-color:rgba(0,230,118,.3);"
+          onclick="setFilter('insert')">INSERT</button>
+        <button class="type-filter-btn" id="filter-update"
+          style="color:var(--amber);border-color:rgba(255,171,64,.3);"
+          onclick="setFilter('update')">UPDATE</button>
+        <button class="type-filter-btn" id="filter-delete"
+          style="color:var(--red);border-color:rgba(255,82,82,.3);"
+          onclick="setFilter('delete')">DELETE</button>
+        <div style="flex:1;"></div>
+        <input class="search-bar" id="log-search" placeholder="Search SQL…"
+          style="width:200px;" oninput="render()"/>
+      </div>
+
+      <!-- LOG LIST -->
+      <div id="log-list"></div>
+      <div class="pagination-bar" id="log-pagination" style="background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:var(--r2);margin-top:0;"></div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('sqllog');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('SQL Log');
+
+const PAGE_SIZE = 15;
+let activeFilter = '';
+let currentPage  = 1;
+
+function getType(sql) {
+  const s = sql.trim().toUpperCase();
+  if (s.startsWith('SELECT')) return 'select';
+  if (s.startsWith('INSERT')) return 'insert';
+  if (s.startsWith('UPDATE')) return 'update';
+  if (s.startsWith('DELETE')) return 'delete';
+  return 'select';
+}
+
+function fmtSQLEnhanced(sql) {
+  // Keywords purple, values amber, table names accent
+  return sql
+    .replace(/\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|FROM|SET|WHERE|VALUES|JOIN|LEFT JOIN|INNER JOIN|ON|ORDER BY|GROUP BY|LIMIT|AND|OR|NOT|NULL|NOW|RETURNING|COALESCE|COUNT|SUM|CASE|WHEN|THEN|ELSE|END)\b/g,
+      '<span class="kw">$1</span>')
+    .replace(/'([^']*)'/g, "<span class='val'>'$1'</span>")
+    .replace(/\$\d+/g, m => `<span style="color:var(--green);opacity:.8;">${m}</span>`);
+}
+
+function setFilter(type) {
+  activeFilter = type;
+  currentPage = 1;
+  document.querySelectorAll('.type-filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('filter-' + (type||'all')).classList.add('active');
+  render();
+}
+
+function render() {
+  const logs = getSQLLog(); // always reads fresh from localStorage
+  const q    = (document.getElementById('log-search')?.value||'').toLowerCase();
+
+  // Stats
+  document.getElementById('stat-total').textContent  = logs.length;
+  document.getElementById('stat-select').textContent = logs.filter(l=>getType(l.sql)==='select').length;
+  document.getElementById('stat-insert').textContent = logs.filter(l=>getType(l.sql)==='insert').length;
+  document.getElementById('stat-update').textContent = logs.filter(l=>getType(l.sql)==='update').length;
+  document.getElementById('stat-delete').textContent = logs.filter(l=>getType(l.sql)==='delete').length;
+  document.getElementById('log-updated').textContent = logs.length ? `${logs.length} quer${logs.length===1?'y':'ies'} logged` : '';
+
+  // Filter
+  let filtered = logs;
+  if (activeFilter) filtered = filtered.filter(l => getType(l.sql) === activeFilter);
+  if (q) filtered = filtered.filter(l => l.sql.toLowerCase().includes(q));
+
+  if (!filtered.length) {
+    document.getElementById('log-list').innerHTML = `
+      <div class="log-empty">
+        <div class="log-empty-icon">
+          <svg width="48" height="48" viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="3" width="22" height="22" rx="3" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="3" y1="9" x2="25" y2="9" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+            <polyline points="7,14 10,17 7,20" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="13" y1="20" x2="21" y2="20" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="log-empty-title">${logs.length===0 ? 'No queries yet' : 'No matching queries'}</div>
+        <div class="log-empty-sub">${logs.length===0
+          ? 'Interact with drones, orders, or hubs to generate SQL queries'
+          : 'Try a different filter or search term'}</div>
+      </div>`;
+    document.getElementById('log-pagination').innerHTML='';
+    return;
+  }
+
+  // Pagination
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage-1)*PAGE_SIZE;
+  const slice = filtered.slice(start, start+PAGE_SIZE);
+
+  document.getElementById('log-list').innerHTML = slice.map((e,i) => {
+    const idx   = logs.length - logs.indexOf(e);
+    const type  = getType(e.sql);
+    const typeClass = `type-${type}`;
+    return `<div class="log-card">
+      <div class="log-card-header">
+        <span class="log-num">#${idx}</span>
+        <span class="log-ts">${e.ts}</span>
+        <span class="log-type-badge ${typeClass}">${type.toUpperCase()}</span>
+        <button class="copy-btn" id="copy-${i}" onclick="copySQL('${escSQL(e.sql)}',${i})">Copy</button>
+      </div>
+      <div class="log-body">
+        <div class="log-sql">${fmtSQLEnhanced(e.sql)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Pagination bar
+  renderPagination(total, totalPages);
+}
+
+function escSQL(sql) {
+  return sql.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
+}
+
+function copySQL(sql, btnIdx) {
+  navigator.clipboard.writeText(sql.replace(/\\n/g,'\n')).then(() => {
+    const btn = document.getElementById('copy-'+btnIdx);
+    if (btn) { btn.textContent='Copied!'; btn.classList.add('copied'); setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); },1800); }
+  });
+}
+
+function renderPagination(total, totalPages) {
+  const el = document.getElementById('log-pagination');
+  if (total===0){el.innerHTML='';return;}
+  const start=(currentPage-1)*PAGE_SIZE+1;
+  const end=Math.min(currentPage*PAGE_SIZE,total);
+  let pages=[];
+  for(let i=1;i<=totalPages;i++){
+    if(i===1||i===totalPages||(i>=currentPage-2&&i<=currentPage+2)) pages.push(i);
+    else if(pages[pages.length-1]!=='…') pages.push('…');
+  }
+  const btns=pages.map(p=>p==='…'
+    ?`<span class="pg-dots">…</span>`
+    :`<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+  ).join('');
+  el.innerHTML=`
+    <div class="pagination-info">Showing <b>${start}–${end}</b> of <b>${total}</b> queries</div>
+    <div class="pagination-controls">
+      <button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+      ${btns}
+      <button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
+    </div>`;
+}
+function goPage(p){
+  const tp=Math.ceil(getSQLLog().length/PAGE_SIZE);
+  if(p<1||p>tp)return;
+  currentPage=p;
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function clearLog() {
+  clearSQLLog();
+  render();
+  toast('SQL log cleared','info');
+}
+
+render();
+// Auto-refresh every 3 seconds so new queries appear live
+setInterval(render, 3000);
+</script>
+</body>
+</html>

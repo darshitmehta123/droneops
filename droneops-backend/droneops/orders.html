@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — Orders</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.field-err { color:var(--red); font-size:11px; font-family:var(--mono); margin-top:-12px; margin-bottom:10px; display:none; }
+.status-tab {
+  padding:6px 14px; border-radius:20px; font-family:var(--mono); font-size:11px;
+  font-weight:700; border:1px solid; letter-spacing:.3px; cursor:pointer;
+  transition:all .15s ease; background:transparent;
+}
+.status-tab.active-tab { transform:scale(1.04); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <!-- HEADER -->
+      <div class="section-header">
+        <div class="section-title">All Orders</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <input class="search-bar" id="search" placeholder="Search customer / order ID…" oninput="onSearch()"/>
+          <select class="form-select" id="status-filter" style="width:155px;" onchange="onSearch()">
+            <option value="">All Statuses</option>
+            <option>pending</option><option>confirmed</option><option>dispatched</option>
+            <option>in-transit</option><option>delivered</option><option>cancelled</option><option>failed</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- STAT CARDS -->
+      <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+        <div class="stat-card green">
+          <div class="stat-label">Active Orders</div>
+          <div class="stat-value" id="s-active">—</div>
+          <div class="stat-sub" id="sub-active">In progress</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value" id="s-pending">—</div>
+          <div class="stat-sub">Awaiting drone</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="stat-label">Delivered</div>
+          <div class="stat-value" id="s-delivered">—</div>
+          <div class="stat-sub">Completed</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Failed / Cancelled</div>
+          <div class="stat-value" id="s-failed">—</div>
+          <div class="stat-sub">Needs attention</div>
+        </div>
+      </div>
+
+      <!-- STATUS FILTER PILLS -->
+      <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;" id="status-pills"></div>
+
+      <!-- TABLE -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th><th>Customer</th><th>Hub</th><th>Status</th>
+              <th>Drone</th><th>Weight</th><th>Price</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="order-table">
+            <tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:12px;">Loading...</td></tr>
+          </tbody>
+        </table>
+        <div class="pagination-bar" id="order-pagination"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- UPDATE ORDER MODAL -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">Update Order</div>
+      <button class="modal-close" onclick="closeModal('order-modal')">×</button>
+    </div>
+
+    <!-- Order info display -->
+    <div style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span class="mono" style="color:var(--accent);font-size:14px;font-weight:700;" id="o-id-display">—</span>
+        <span id="o-status-display"></span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);" id="o-info-display">—</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">New Status</label>
+      <select class="form-select" id="o-status">
+        <option>pending</option><option>confirmed</option><option>dispatched</option>
+        <option>in-transit</option><option>delivered</option><option>cancelled</option><option>failed</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Special Instructions <span style="color:var(--text3);font-size:9px;">(optional, max 500 chars)</span></label>
+      <input class="form-input" id="o-notes" placeholder="Add a note…" maxlength="500"/>
+      <div class="field-err" id="err-notes">Max 500 characters allowed</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('order-modal')">Cancel</button>
+      <button class="btn btn-primary" id="save-order-btn" onclick="saveOrder()">Update Order</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('orders');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('Orders');
+
+const PAGE_SIZE = 10;
+let allOrders = [];
+let allDrones = [];
+let filtered  = [];
+let currentPage = 1;
+let activeOrderId = null;
+
+// ── LOAD DATA ──
+async function loadData() {
+  try {
+    [allOrders, allDrones] = await Promise.all([ GET('/orders'), GET('/drones') ]);
+    filtered = [...allOrders];
+    renderStats();
+    renderStatusPills();
+    renderTable();
+  } catch(err) { toast('Failed to load orders','error'); }
+}
+
+// ── STATS ──
+function renderStats() {
+  const active    = allOrders.filter(o => !['delivered','cancelled','failed'].includes(o.status)).length;
+  const pending   = allOrders.filter(o => o.status==='pending').length;
+  const delivered = allOrders.filter(o => o.status==='delivered').length;
+  const failed    = allOrders.filter(o => ['failed','cancelled'].includes(o.status)).length;
+  document.getElementById('s-active').textContent    = active;
+  document.getElementById('sub-active').textContent  = `${allOrders.filter(o=>o.status==='in-transit').length} in-transit`;
+  document.getElementById('s-pending').textContent   = pending;
+  document.getElementById('s-delivered').textContent = delivered;
+  document.getElementById('s-failed').textContent    = failed;
+}
+
+// ── STATUS PILLS ──
+function renderStatusPills() {
+  const statuses = [
+    { key:'pending',    color:'var(--amber)', bg:'rgba(255,171,64,.08)', border:'rgba(255,171,64,.2)' },
+    { key:'confirmed',  color:'var(--accent)', bg:'rgba(0,212,255,.06)', border:'rgba(0,212,255,.2)' },
+    { key:'dispatched', color:'var(--accent)', bg:'rgba(0,212,255,.07)', border:'rgba(0,212,255,.2)' },
+    { key:'in-transit', color:'var(--green)',  bg:'rgba(0,230,118,.06)', border:'rgba(0,230,118,.2)' },
+    { key:'delivered',  color:'var(--green)',  bg:'rgba(0,230,118,.08)', border:'rgba(0,230,118,.25)' },
+    { key:'cancelled',  color:'var(--text2)',  bg:'rgba(255,255,255,.04)', border:'rgba(255,255,255,.1)' },
+    { key:'failed',     color:'var(--red)',    bg:'rgba(255,82,82,.08)',  border:'rgba(255,82,82,.2)' },
+  ];
+  document.getElementById('status-pills').innerHTML = statuses.map(s => {
+    const count = allOrders.filter(o => o.status === s.key).length;
+    if (count === 0) return '';
+    const sf = document.getElementById('status-filter').value;
+    const isActive = sf === s.key;
+    return `<button class="status-tab ${isActive?'active-tab':''}"
+      style="color:${s.color};background:${s.bg};border-color:${s.border};"
+      onclick="filterByStatus('${s.key}')">
+      ${s.key}: ${count}
+    </button>`;
+  }).join('');
+}
+
+function filterByStatus(status) {
+  const sf = document.getElementById('status-filter');
+  sf.value = sf.value === status ? '' : status;
+  onSearch();
+}
+
+// ── SEARCH ──
+function onSearch() {
+  const q  = document.getElementById('search').value.toLowerCase();
+  const sf = document.getElementById('status-filter').value;
+  filtered = allOrders.filter(o => {
+    const matchQ  = !q || String(o.order_id).includes(q) || (o.customer_name||'').toLowerCase().includes(q) || (o.hub_name||'').toLowerCase().includes(q);
+    const matchSF = !sf || o.status === sf;
+    return matchQ && matchSF;
+  });
+  currentPage = 1;
+  renderStatusPills();
+  renderTable();
+}
+
+// ── RENDER TABLE ──
+function renderTable() {
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage-1) * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('order-table').innerHTML = slice.length
+    ? slice.map(o => {
+        const drone = o.assigned_drone_id ? allDrones.find(d => d.drone_id === o.assigned_drone_id) : null;
+        return `<tr>
+          <td class="mono" style="color:var(--accent);font-weight:700;">#${o.order_id}</td>
+          <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.customer_name||'—'}</td>
+          <td><span class="chip">${o.city||'—'}</span></td>
+          <td>${statusBadge(o.status)}</td>
+          <td>
+            ${drone
+              ? `<span class="mono" style="color:var(--green);font-size:11px;">${drone.serial_number}</span>`
+              : `<span style="color:var(--text3);font-size:11px;">—</span>`}
+          </td>
+          <td class="mono">${o.total_weight_kg} kg</td>
+          <td class="mono">₹${o.total_price}</td>
+          <td class="mono" style="color:var(--text3);font-size:11px;">${new Date(o.placed_at).toLocaleDateString('en-IN')}</td>
+          <td>
+            ${can('orders','update')
+              ? `<button class="btn btn-ghost btn-sm" onclick="openOrderModal(${o.order_id})">Update</button>`
+              : '<span style="color:var(--text3);font-size:11px;font-family:var(--mono);">View only</span>'}
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="9"><div class="empty"><div class="empty-text">No orders match your filter.</div></div></td></tr>`;
+
+  renderPagination(total, totalPages);
+}
+
+// ── PAGINATION ──
+function renderPagination(total, totalPages) {
+  const el = document.getElementById('order-pagination');
+  if (total === 0) { el.innerHTML=''; return; }
+  const start = (currentPage-1)*PAGE_SIZE+1;
+  const end   = Math.min(currentPage*PAGE_SIZE, total);
+  let pages = [];
+  for (let i=1; i<=totalPages; i++) {
+    if (i===1 || i===totalPages || (i>=currentPage-2 && i<=currentPage+2)) pages.push(i);
+    else if (pages[pages.length-1] !== '…') pages.push('…');
+  }
+  const btns = pages.map(p => p==='…'
+    ? `<span class="pg-dots">…</span>`
+    : `<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+  ).join('');
+  el.innerHTML = `
+    <div class="pagination-info">Showing <b>${start}–${end}</b> of <b>${total}</b> orders</div>
+    <div class="pagination-controls">
+      <button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+      ${btns}
+      <button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
+    </div>`;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  if (p<1||p>totalPages) return;
+  currentPage = p;
+  renderTable();
+  document.querySelector('.table-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── ORDER MODAL ──
+function openOrderModal(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  activeOrderId = orderId;
+  document.getElementById('o-id-display').textContent   = `Order #${orderId}`;
+  document.getElementById('o-status-display').innerHTML = statusBadge(o.status);
+  document.getElementById('o-info-display').innerHTML   =
+    `👤 ${o.customer_name||'—'} &nbsp;·&nbsp; 🏭 ${o.hub_name||'—'} &nbsp;·&nbsp; ⚖️ ${o.total_weight_kg} kg &nbsp;·&nbsp; 💰 ₹${o.total_price}`;
+  document.getElementById('o-status').value  = o.status;
+  document.getElementById('o-notes').value   = o.special_instructions||'';
+  document.getElementById('err-notes').style.display='none';
+  openModal('order-modal');
+}
+
+// ── SAVE ORDER ──
+async function saveOrder() {
+  const status = document.getElementById('o-status').value;
+  const notes  = document.getElementById('o-notes').value.trim();
+  if (notes.length > 500) { document.getElementById('err-notes').style.display='block'; return; }
+  document.getElementById('err-notes').style.display='none';
+
+  const btn = document.getElementById('save-order-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    await PUT(`/orders/${activeOrderId}/status`, { status, special_instructions: notes||null });
+    toast(`Order #${activeOrderId} → "${status}"`, status==='delivered'?'success':'info');
+    closeModal('order-modal');
+    await loadData();
+  } catch(err){}
+  btn.disabled=false; btn.textContent='Update Order';
+}
+
+// ── INIT ──
+loadData();
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); })
+);
+</script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — Drones</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <div class="section-header">
+        <div class="section-title">Drone Fleet</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="search-bar" id="search" placeholder="Search serial / model…" oninput="onSearch()"/>
+          <span id="add-drone-btn"></span>
+        </div>
+      </div>
+
+      <!-- Stats summary row -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;" id="fleet-summary"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Model</th><th>Serial</th><th>Hub</th>
+              <th>Payload</th><th>Battery</th><th>Range</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="drone-table">
+            <tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:12px;">Loading...</td></tr>
+          </tbody>
+        </table>
+        <div class="pagination-bar" id="drone-pagination"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="modal-overlay" id="drone-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add Drone</div>
+      <button class="modal-close" onclick="closeModal('drone-modal')">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Model * <span style="color:var(--text3);font-size:9px;">(max 100 chars)</span></label>
+        <input class="form-input" id="d-model" placeholder="DJI Matrice 300" maxlength="100"/>
+        <div class="field-err" id="err-model">Model is required (max 100 characters)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Serial Number * <span style="color:var(--text3);font-size:9px;">(unique, max 80)</span></label>
+        <input class="form-input" id="d-serial" placeholder="SN-XXX-001" maxlength="80"/>
+        <div class="field-err" id="err-serial">Serial number is required (max 80 characters)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hub *</label>
+        <select class="form-select" id="d-hub"></select>
+        <div class="field-err" id="err-hub">Please select a hub</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="d-status">
+          <option value="available">available</option>
+          <option value="in-flight">in-flight</option>
+          <option value="charging">charging</option>
+          <option value="maintenance">maintenance</option>
+          <option value="retired">retired</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Max Payload (kg) * <span style="color:var(--text3);font-size:9px;">(&gt; 0)</span></label>
+        <input class="form-input" id="d-payload" type="number" step="0.01" min="0.01" max="999.99" placeholder="9.00"/>
+        <div class="field-err" id="err-payload">Must be greater than 0</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Battery Capacity (Wh) * <span style="color:var(--text3);font-size:9px;">(&gt; 0)</span></label>
+        <input class="form-input" id="d-battery" type="number" step="0.01" min="0.01" placeholder="400"/>
+        <div class="field-err" id="err-battery">Must be greater than 0</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Max Range (km) * <span style="color:var(--text3);font-size:9px;">(&gt; 0)</span></label>
+        <input class="form-input" id="d-range" type="number" step="0.01" min="0.01" placeholder="45"/>
+        <div class="field-err" id="err-range">Must be greater than 0</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Battery % <span style="color:var(--text3);font-size:9px;">(0–100)</span></label>
+        <input class="form-input" id="d-batpct" type="number" min="0" max="100" placeholder="100"/>
+        <div class="field-err" id="err-batpct">Must be between 0 and 100</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('drone-modal')">Cancel</button>
+      <button class="btn btn-primary" id="save-drone-btn" onclick="saveDrone()">Save Drone</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="width:380px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--red);">Confirm Delete</div>
+      <button class="modal-close" onclick="closeModal('confirm-modal')">×</button>
+    </div>
+    <div class="confirm-msg" id="confirm-msg">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('confirm-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="execDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.field-err { color:var(--red); font-size:11px; font-family:var(--mono); margin-top:-12px; margin-bottom:10px; display:none; }
+.fleet-pill {
+  padding:5px 14px; border-radius:20px; font-family:var(--mono); font-size:11px;
+  font-weight:700; border:1px solid; letter-spacing:.3px;
+}
+</style>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('drones');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('Drones');
+
+// Render Add button only if permitted
+document.getElementById('add-drone-btn').innerHTML = can('drones','create')
+  ? '<button class="btn btn-primary" onclick="openAdd()">+ Add Drone</button>'
+  : '<span style="font-family:var(--mono);font-size:11px;padding:6px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text3);">View only</span>';
+
+const PAGE_SIZE = 10;
+let allDrones = [];
+let allHubs   = [];
+let filtered  = [];
+let currentPage = 1;
+let editingId = null;
+let deleteId  = null;
+
+// ── LOAD DATA ──
+async function loadData() {
+  try {
+    [allDrones, allHubs] = await Promise.all([ GET('/drones'), GET('/hubs') ]);
+    filtered = [...allDrones];
+    renderSummary();
+    renderTable();
+    populateHubDropdown('');
+  } catch(err) { toast('Failed to load drones', 'error'); }
+}
+
+// ── FLEET SUMMARY PILLS ──
+function renderSummary() {
+  const pills = [
+    { label:'Total',       val: allDrones.length,                                          color:'var(--accent)', bg:'rgba(0,212,255,.08)',  border:'rgba(0,212,255,.2)' },
+    { label:'Available',   val: allDrones.filter(d=>d.status==='available').length,        color:'var(--green)',  bg:'rgba(0,230,118,.08)',  border:'rgba(0,230,118,.2)' },
+    { label:'In-Flight',   val: allDrones.filter(d=>d.status==='in-flight').length,        color:'var(--accent)', bg:'rgba(0,212,255,.06)',  border:'rgba(0,212,255,.15)' },
+    { label:'Charging',    val: allDrones.filter(d=>d.status==='charging').length,         color:'var(--amber)',  bg:'rgba(255,171,64,.08)', border:'rgba(255,171,64,.2)' },
+    { label:'Maintenance', val: allDrones.filter(d=>d.status==='maintenance').length,      color:'var(--red)',    bg:'rgba(255,82,82,.08)',  border:'rgba(255,82,82,.2)' },
+    { label:'Retired',     val: allDrones.filter(d=>d.status==='retired').length,          color:'var(--text2)',  bg:'rgba(255,255,255,.04)', border:'rgba(255,255,255,.1)' },
+  ];
+  document.getElementById('fleet-summary').innerHTML = pills.map(p =>
+    `<div class="fleet-pill" style="color:${p.color};background:${p.bg};border-color:${p.border};">${p.label}: ${p.val}</div>`
+  ).join('');
+}
+
+// ── SEARCH ──
+function onSearch() {
+  const q = document.getElementById('search').value.toLowerCase();
+  filtered = q
+    ? allDrones.filter(d => d.model.toLowerCase().includes(q) || d.serial_number.toLowerCase().includes(q) || String(d.drone_id).includes(q))
+    : [...allDrones];
+  currentPage = 1;
+  renderTable();
+}
+
+// ── RENDER TABLE WITH PAGINATION ──
+function renderTable() {
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('drone-table').innerHTML = slice.length
+    ? slice.map(d => {
+        const hub = allHubs.find(h => h.hub_id === d.hub_id) || {};
+        return `<tr>
+          <td class="mono" style="color:var(--accent);font-weight:700;">${d.drone_id}</td>
+          <td><b>${d.model}</b></td>
+          <td class="mono">${d.serial_number}</td>
+          <td><span class="chip">${hub.city || '—'}</span></td>
+          <td class="mono">${d.max_payload_kg} kg</td>
+          <td>${batteryBar(d.current_battery_pct)}</td>
+          <td class="mono">${d.max_range_km} km</td>
+          <td>${statusBadge(d.status)}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              ${can('drones','update') ? `<button class="btn btn-warn btn-sm" onclick="openEdit(${d.drone_id})">Edit</button>` : ''}
+              ${can('drones','delete') ? `<button class="btn btn-danger btn-sm" onclick="askDelete(${d.drone_id},'${d.serial_number}')">Delete</button>` : ''}
+              ${!can('drones','update') && !can('drones','delete') ? '<span style="color:var(--text3);font-size:11px;font-family:var(--mono);">View only</span>' : ''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="9"><div class="empty"><div class="empty-text">No drones found.</div></div></td></tr>`;
+
+  renderPagination(total, totalPages);
+}
+
+// ── PAGINATION ──
+function renderPagination(total, totalPages) {
+  const el = document.getElementById('drone-pagination');
+  if (total === 0) { el.innerHTML=''; return; }
+
+  const start = (currentPage-1)*PAGE_SIZE + 1;
+  const end   = Math.min(currentPage*PAGE_SIZE, total);
+
+  // Build page buttons — show max 5 around current
+  let pages = [];
+  for (let i=1; i<=totalPages; i++) {
+    if (i===1 || i===totalPages || (i>=currentPage-2 && i<=currentPage+2)) pages.push(i);
+    else if (pages[pages.length-1] !== '…') pages.push('…');
+  }
+
+  const btns = pages.map(p => p==='…'
+    ? `<span class="pg-dots">…</span>`
+    : `<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="pagination-info">Showing <b>${start}–${end}</b> of <b>${total}</b> drones</div>
+    <div class="pagination-controls">
+      <button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+      ${btns}
+      <button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
+    </div>`;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  renderTable();
+  document.querySelector('.table-wrap').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ── HUB DROPDOWN ──
+function populateHubDropdown(selectedId) {
+  document.getElementById('d-hub').innerHTML =
+    `<option value="">— Select hub —</option>` +
+    allHubs.map(h => `<option value="${h.hub_id}" ${selectedId==h.hub_id?'selected':''}>${h.hub_name} (${h.city})</option>`).join('');
+}
+
+// ── VALIDATION ──
+function validateDroneForm() {
+  let ok = true;
+  const checks = [
+    { id:'d-model',   err:'err-model',   msg:'Model is required (max 100 chars)',        fn: v => v.length > 0 && v.length <= 100 },
+    { id:'d-serial',  err:'err-serial',  msg:'Serial number required (max 80 chars)',    fn: v => v.length > 0 && v.length <= 80 },
+    { id:'d-hub',     err:'err-hub',     msg:'Please select a hub',                      fn: v => v !== '' },
+    { id:'d-payload', err:'err-payload', msg:'Max payload must be > 0',                  fn: v => parseFloat(v) > 0 },
+    { id:'d-battery', err:'err-battery', msg:'Battery capacity must be > 0',             fn: v => parseFloat(v) > 0 },
+    { id:'d-range',   err:'err-range',   msg:'Max range must be > 0',                    fn: v => parseFloat(v) > 0 },
+    { id:'d-batpct',  err:'err-batpct',  msg:'Battery % must be 0–100',                  fn: v => { const n=parseInt(v); return n>=0 && n<=100; } },
+  ];
+  checks.forEach(c => {
+    const val = document.getElementById(c.id).value.trim();
+    const errEl = document.getElementById(c.err);
+    if (!c.fn(val)) {
+      errEl.textContent = c.msg; errEl.style.display='block'; ok=false;
+      document.getElementById(c.id).style.borderColor='var(--red)';
+    } else {
+      errEl.style.display='none';
+      document.getElementById(c.id).style.borderColor='';
+    }
+  });
+  return ok;
+}
+
+// ── OPEN MODALS ──
+function openAdd() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add Drone';
+  populateHubDropdown('');
+  ['d-model','d-serial','d-payload','d-battery','d-range'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('d-batpct').value = 100;
+  document.getElementById('d-status').value = 'available';
+  ['err-model','err-serial','err-hub','err-payload','err-battery','err-range','err-batpct'].forEach(id => {
+    document.getElementById(id).style.display='none';
+  });
+  openModal('drone-modal');
+}
+
+function openEdit(id) {
+  editingId = id;
+  const d = allDrones.find(x => x.drone_id === id);
+  document.getElementById('modal-title').textContent = `Edit Drone #${id}`;
+  populateHubDropdown(d.hub_id);
+  document.getElementById('d-model').value  = d.model;
+  document.getElementById('d-serial').value = d.serial_number;
+  document.getElementById('d-status').value = d.status;
+  document.getElementById('d-payload').value = d.max_payload_kg;
+  document.getElementById('d-battery').value = d.battery_capacity_wh;
+  document.getElementById('d-range').value   = d.max_range_km;
+  document.getElementById('d-batpct').value  = d.current_battery_pct;
+  ['err-model','err-serial','err-hub','err-payload','err-battery','err-range','err-batpct'].forEach(id => {
+    document.getElementById(id).style.display='none';
+  });
+  openModal('drone-modal');
+}
+
+// ── SAVE DRONE ──
+async function saveDrone() {
+  if (!validateDroneForm()) return;
+
+  const body = {
+    hub_id:              parseInt(document.getElementById('d-hub').value),
+    model:               document.getElementById('d-model').value.trim(),
+    serial_number:       document.getElementById('d-serial').value.trim(),
+    status:              document.getElementById('d-status').value,
+    max_payload_kg:      parseFloat(document.getElementById('d-payload').value),
+    battery_capacity_wh: parseFloat(document.getElementById('d-battery').value),
+    max_range_km:        parseFloat(document.getElementById('d-range').value),
+    current_battery_pct: parseInt(document.getElementById('d-batpct').value) || 100,
+  };
+
+  const btn = document.getElementById('save-drone-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    if (editingId) {
+      await PUT(`/drones/${editingId}`, body);
+      toast(`Drone #${editingId} updated`, 'success');
+    } else {
+      await POST('/drones', body);
+      toast('Drone added to fleet', 'success');
+    }
+    closeModal('drone-modal');
+    await loadData();
+  } catch(err) {
+    // error shown by API helper
+  }
+  btn.disabled = false; btn.textContent = 'Save Drone';
+}
+
+// ── DELETE ──
+function askDelete(id, label) {
+  deleteId = id;
+  document.getElementById('confirm-msg').innerHTML =
+    `Delete drone <b style="color:var(--text)">${label}</b>?<br><span style="font-size:12px;color:var(--text3);">This action cannot be undone.</span>`;
+  openModal('confirm-modal');
+}
+async function execDelete() {
+  try {
+    await DEL(`/drones/${deleteId}`);
+    toast('Drone removed from fleet', 'info');
+    closeModal('confirm-modal');
+    await loadData();
+  } catch(err) {}
+}
+
+// ── INIT ──
+loadData();
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); })
+);
+// Clear error on input
+document.querySelectorAll('.form-input, .form-select').forEach(el => {
+  el.addEventListener('input', () => { el.style.borderColor=''; });
+});
+</script>
+</body>
+</html>

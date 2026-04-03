@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — Login</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+body {
+  display:flex; align-items:center; justify-content:center; min-height:100vh;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, #001a2e 0%, var(--bg) 70%);
+  position:relative; overflow:hidden;
+}
+body::before {
+  content:''; position:absolute; inset:0;
+  background-image:
+    repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px),
+    repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.03) 39px,rgba(255,255,255,.03) 40px);
+  pointer-events:none;
+}
+.login-box {
+  background:rgba(15,19,28,.85);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:20px; padding:48px 44px; width:420px;
+  position:relative; z-index:1;
+  box-shadow:0 0 80px rgba(0,212,255,.06), 0 32px 64px rgba(0,0,0,.6);
+  animation:fadein .45s cubic-bezier(.4,0,.2,1);
+}
+.login-box::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(0,212,255,.3), transparent);
+  border-radius:20px 20px 0 0;
+}
+@keyframes fadein { from{opacity:0;transform:translateY(20px) scale(.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+.login-logo { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.login-logo-icon { width:44px; height:44px; background:transparent; display:flex; align-items:center; justify-content:center; }
+.login-logo h1 { font-family:var(--mono); font-size:22px; color:var(--text); letter-spacing:-.5px; }
+.login-logo h1 span { color:var(--accent); }
+.login-sub { font-size:13px; color:var(--text3); margin-bottom:32px; font-family:var(--mono); letter-spacing:.3px; }
+.login-label { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text3); margin-bottom:8px; display:block; }
+.login-input {
+  width:100%;
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--text); font-family:var(--sans); font-size:15px;
+  padding:12px 16px; border-radius:10px; outline:none;
+  transition:border-color .2s, box-shadow .2s;
+  margin-bottom:20px;
+}
+.login-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,212,255,.1); }
+.login-input.error { border-color:var(--red); box-shadow:0 0 0 3px rgba(255,82,82,.1); animation:shake .3s ease; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+.login-btn {
+  width:100%; padding:13px;
+  background:var(--accent); color:#000;
+  font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:1px;
+  border:none; border-radius:10px; cursor:pointer;
+  transition:all .2s cubic-bezier(.4,0,.2,1);
+  margin-top:4px; position:relative; overflow:hidden;
+}
+.login-btn:hover { background:#00c4ee; box-shadow:0 6px 24px rgba(0,212,255,.4); transform:translateY(-1px); }
+.login-btn:active { transform:scale(.98); }
+.login-btn:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+.login-btn-text { transition:opacity .15s; }
+.login-spinner { display:none; }
+.login-btn.loading .login-btn-text { opacity:0; }
+.login-btn.loading .login-spinner { display:inline-block; animation:spin .7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.login-err {
+  color:var(--red); font-size:12px; margin-top:12px;
+  display:none; font-family:var(--mono);
+  background:rgba(255,82,82,.08);
+  border:1px solid rgba(255,82,82,.2);
+  border-radius:8px; padding:10px 14px;
+}
+.field-err { color:var(--red); font-size:11px; font-family:var(--mono); margin-top:-14px; margin-bottom:10px; display:none; }
+.login-hint {
+  color:var(--text3); font-size:11px; text-align:center; margin-top:20px;
+  background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.05);
+  border-radius:8px; padding:10px; font-family:var(--mono);
+}
+.login-hint b { color:var(--amber); }
+.divider { display:flex; align-items:center; gap:12px; margin:20px 0; }
+.divider hr { flex:1; border:none; border-top:1px solid rgba(255,255,255,.05); }
+.divider span { font-size:10px; color:var(--text3); font-family:var(--mono); }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="login-logo">
+    <div class="login-logo-icon">
+      <img src="logo.svg" style="width:44px;height:44px;object-fit:contain;"/>
+    </div>
+    <h1>Drone<span>Ops</span></h1>
+  </div>
+  <p class="login-sub">Admin Control System</p>
+
+  <label class="login-label">Username</label>
+  <input class="login-input" id="login-user" type="text" placeholder="Enter username"
+    autocomplete="off" minlength="4" maxlength="50"/>
+  <div class="field-err" id="err-user">Username must be at least 4 characters</div>
+
+  <label class="login-label">Password</label>
+  <input class="login-input" id="login-pass" type="password" placeholder="••••••••"
+    minlength="6" maxlength="255"/>
+  <div class="field-err" id="err-pass">Password must be at least 6 characters</div>
+
+  <button class="login-btn" id="login-btn" onclick="doLogin()">
+    <span class="login-btn-text">ACCESS SYSTEM →</span>
+    <span class="login-spinner">↻</span>
+  </button>
+  <div class="login-err" id="login-err"></div>
+
+  <div class="divider"><hr/><span>credentials</span><hr/></div>
+ 
+</div>
+
+<script src="shared.js"></script>
+<script>
+if (sessionStorage.getItem('droneops_admin') === 'true') {
+  window.location.href = 'dashboard.html';
+}
+
+function validateField(id, errId, min, label) {
+  const val = document.getElementById(id).value.trim();
+  const errEl = document.getElementById(errId);
+  const inputEl = document.getElementById(id);
+  if (val.length < min) {
+    errEl.style.display = 'block';
+    inputEl.classList.add('error');
+    setTimeout(() => inputEl.classList.remove('error'), 400);
+    return false;
+  }
+  errEl.style.display = 'none';
+  return true;
+}
+
+async function doLogin() {
+  // ── CLIENT-SIDE VALIDATION (mirrors DB constraints) ──
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value.trim();
+  const errEl = document.getElementById('login-err');
+  errEl.style.display = 'none';
+
+  // username: min 4 chars (matches CHECK constraint in admin table)
+  const uOk = validateField('login-user', 'err-user', 4, 'Username');
+  // password: min 6 chars
+  const pOk = validateField('login-pass', 'err-pass', 6, 'Password');
+  if (!uOk || !pOk) return;
+
+  // ── LOADING STATE ──
+  const btn = document.getElementById('login-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  try {
+    // ── CALL REAL DATABASE via API ──
+    const res = await fetch('http://localhost:3000/api/admin/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Invalid credentials');
+    }
+
+    // ── SUCCESS — store admin info and redirect ──
+    sessionStorage.setItem('droneops_admin', 'true');
+    sessionStorage.setItem('admin_name', data.admin.admin_name);
+    sessionStorage.setItem('admin_role', data.admin.role);
+    sessionStorage.setItem('admin_id',   data.admin.admin_id);
+
+    // Fade out before redirect
+    document.querySelector('.login-box').style.transition = 'all .3s ease';
+    document.querySelector('.login-box').style.opacity = '0';
+    document.querySelector('.login-box').style.transform = 'translateY(-10px) scale(.98)';
+    setTimeout(() => { window.location.href = 'dashboard.html'; }, 280);
+
+  } catch (err) {
+    errEl.textContent = '⚠ ' + (err.message || 'Invalid credentials. Please try again.');
+    errEl.style.display = 'block';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-pass').focus(); });
+
+// Clear field errors on input
+['login-user','login-pass'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    document.getElementById(id).style.borderColor = '';
+    document.getElementById(id === 'login-user' ? 'err-user' : 'err-pass').style.display = 'none';
+    document.getElementById('login-err').style.display = 'none';
+  });
+});
+</script>
+</body>
+</html>

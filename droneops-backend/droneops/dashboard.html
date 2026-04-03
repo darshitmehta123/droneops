@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<title>DroneOps — Dashboard</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <!-- HEADER -->
+      <div class="section-header" style="margin-bottom:22px;">
+        <div class="section-title">Live Dashboard</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="last-updated" id="last-updated"></span>
+          <button class="refresh-btn" onclick="loadAll()">
+            <span id="refresh-icon">↻</span> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- STAT CARDS ROW 1 -->
+      <div class="stats-row">
+
+        <!-- Total Drones -->
+        <div class="stat-card accent">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <rect x="10" y="11" width="8" height="6" rx="1.5" fill="#00d4ff"/>
+              <ellipse cx="5" cy="9" rx="4" ry="1.8" stroke="#00d4ff" stroke-width="1.5"/>
+              <ellipse cx="23" cy="9" rx="4" ry="1.8" stroke="#00d4ff" stroke-width="1.5"/>
+              <ellipse cx="5" cy="19" rx="4" ry="1.8" stroke="#00d4ff" stroke-width="1.5"/>
+              <ellipse cx="23" cy="19" rx="4" ry="1.8" stroke="#00d4ff" stroke-width="1.5"/>
+              <line x1="10" y1="12.5" x2="5" y2="9" stroke="#00d4ff" stroke-width="1.2"/>
+              <line x1="18" y1="12.5" x2="23" y2="9" stroke="#00d4ff" stroke-width="1.2"/>
+              <line x1="10" y1="15.5" x2="5" y2="19" stroke="#00d4ff" stroke-width="1.2"/>
+              <line x1="18" y1="15.5" x2="23" y2="19" stroke="#00d4ff" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="stat-label">Total Drones</div>
+          <div class="stat-value" id="stat-drones">—</div>
+          <div class="stat-sub" id="sub-drones">Loading...</div>
+        </div>
+
+        <!-- Active Orders -->
+        <div class="stat-card green">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <rect x="4" y="4" width="20" height="20" rx="2.5" stroke="#00e676" stroke-width="1.5"/>
+              <line x1="8" y1="10" x2="20" y2="10" stroke="#00e676" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="14" x2="17" y2="14" stroke="#00e676" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="18" x2="13" y2="18" stroke="#00e676" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="stat-label">Active Orders</div>
+          <div class="stat-value" id="stat-orders">—</div>
+          <div class="stat-sub" id="sub-orders">Loading...</div>
+        </div>
+
+        <!-- In-Flight -->
+        <div class="stat-card amber">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <path d="M14 3L25 9V19L14 25L3 19V9L14 3Z" stroke="#ffab40" stroke-width="1.5"/>
+              <circle cx="14" cy="14" r="3" fill="#ffab40"/>
+              <line x1="14" y1="11" x2="14" y2="3" stroke="#ffab40" stroke-width="1" opacity="0.5"/>
+              <line x1="14" y1="17" x2="14" y2="25" stroke="#ffab40" stroke-width="1" opacity="0.5"/>
+              <line x1="11.4" y1="12.5" x2="4.5" y2="8.5" stroke="#ffab40" stroke-width="1" opacity="0.5"/>
+              <line x1="16.6" y1="15.5" x2="23.5" y2="19.5" stroke="#ffab40" stroke-width="1" opacity="0.5"/>
+              <line x1="16.6" y1="12.5" x2="23.5" y2="8.5" stroke="#ffab40" stroke-width="1" opacity="0.5"/>
+              <line x1="11.4" y1="15.5" x2="4.5" y2="19.5" stroke="#ffab40" stroke-width="1" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="stat-label">In-Flight</div>
+          <div class="stat-value" id="stat-inflight">—</div>
+          <div class="stat-sub" id="sub-inflight">Loading...</div>
+        </div>
+
+        <!-- Maintenance -->
+        <div class="stat-card red">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <rect x="3" y="3" width="22" height="22" rx="3" stroke="#ff5252" stroke-width="1.5"/>
+              <line x1="3" y1="9" x2="25" y2="9" stroke="#ff5252" stroke-width="1" opacity="0.5"/>
+              <circle cx="6.5" cy="6" r="1" fill="#ff5252" opacity="0.6"/>
+              <circle cx="10" cy="6" r="1" fill="#ff5252" opacity="0.4"/>
+              <circle cx="13.5" cy="6" r="1" fill="#ff5252" opacity="0.2"/>
+              <polyline points="7,14 10,17 7,20" stroke="#ff5252" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="13" y1="20" x2="21" y2="20" stroke="#ff5252" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+            </svg>
+          </div>
+          <div class="stat-label">Maintenance</div>
+          <div class="stat-value" id="stat-maint">—</div>
+          <div class="stat-sub" id="sub-maint">Loading...</div>
+        </div>
+
+      </div>
+
+      <!-- RECENT ORDERS -->
+      <div class="section-header">
+        <div class="section-title">Recent Orders</div>
+        <a href="orders.html" class="btn btn-ghost btn-sm">View All →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Order ID</th><th>Customer</th><th>Hub</th><th>Status</th><th>Drone</th><th>Weight</th><th>Price</th><th>Date</th></tr>
+          </thead>
+          <tbody id="dash-orders">
+            <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:28px;font-family:var(--mono);font-size:12px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- FLEET SNAPSHOT -->
+      <div class="section-header" style="margin-top:28px;">
+        <div class="section-title">Fleet Snapshot</div>
+        <a href="drones.html" class="btn btn-ghost btn-sm">Manage Fleet →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Serial</th><th>Model</th><th>Hub</th><th>Battery</th><th>Status</th></tr>
+          </thead>
+          <tbody id="dash-drones">
+            <tr><td colspan="6" style="text-align:center;color:var(--text3);padding:28px;font-family:var(--mono);font-size:12px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SQL LOG -->
+      <div class="sql-log">
+        <div class="sql-log-title">Last SQL Executed</div>
+        <div id="dash-sql" style="font-family:var(--mono);font-size:11px;color:var(--accent);"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('dashboard');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('Dashboard');
+
+async function loadAll() {
+  const icon = document.getElementById('refresh-icon');
+  icon.classList.add('spinning');
+
+  try {
+    const [drones, orders] = await Promise.all([
+      GET('/drones'),
+      GET('/orders'),
+    ]);
+
+    // ── STATS ──
+    const totalDrones  = drones.length;
+    const availDrones  = drones.filter(d => d.status === 'available').length;
+    const inFlight     = drones.filter(d => d.status === 'in-flight').length;
+    const maintenance  = drones.filter(d => d.status === 'maintenance').length;
+    const charging     = drones.filter(d => d.status === 'charging').length;
+    const activeOrders = orders.filter(o => !['delivered','cancelled','failed'].includes(o.status)).length;
+    const pending      = orders.filter(o => o.status === 'pending').length;
+    const inTransit    = orders.filter(o => o.status === 'in-transit').length;
+
+    document.getElementById('stat-drones').textContent   = totalDrones;
+    document.getElementById('sub-drones').textContent    = `${availDrones} available · ${charging} charging`;
+    document.getElementById('stat-orders').textContent   = activeOrders;
+    document.getElementById('sub-orders').textContent    = `${pending} pending · ${inTransit} in-transit`;
+    document.getElementById('stat-inflight').textContent = inFlight;
+    document.getElementById('sub-inflight').textContent  = inFlight > 0 ? `${inFlight} drone${inFlight>1?'s':''} airborne` : 'None airborne';
+    document.getElementById('stat-maint').textContent    = maintenance;
+    document.getElementById('sub-maint').textContent     = maintenance > 0 ? `${maintenance} grounded` : 'All operational ✓';
+
+    // ── SQL LOG ──
+    const sql = `SELECT o.*, c.full_name, h.hub_name FROM "order" o\nJOIN customer c ON c.customer_id = o.customer_id\nJOIN hub h ON h.hub_id = o.hub_id\nORDER BY o.placed_at DESC LIMIT 5;`;
+    logSQL(sql);
+    document.getElementById('dash-sql').innerHTML = fmtSQL(sql);
+
+    // ── RECENT ORDERS ──
+    document.getElementById('dash-orders').innerHTML = orders.slice(0,5).length
+      ? orders.slice(0,5).map(o => {
+          const drone = o.assigned_drone_id ? drones.find(d => d.drone_id === o.assigned_drone_id) : null;
+          return `<tr>
+            <td class="mono" style="color:var(--accent);font-weight:700;">#${o.order_id}</td>
+            <td>${o.customer_name || '—'}</td>
+            <td><span class="chip">${o.city || '—'}</span></td>
+            <td>${statusBadge(o.status)}</td>
+            <td>${drone ? `<span class="mono" style="color:var(--green);font-size:11px;">${drone.serial_number}</span>` : '<span style="color:var(--text3);font-size:11px;">—</span>'}</td>
+            <td class="mono">${o.total_weight_kg} kg</td>
+            <td class="mono">₹${o.total_price}</td>
+            <td class="mono" style="color:var(--text3);">${new Date(o.placed_at).toLocaleDateString('en-IN')}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="8"><div class="empty"><div class="empty-text">No orders found.</div></div></td></tr>`;
+
+    // ── FLEET SNAPSHOT ──
+    document.getElementById('dash-drones').innerHTML = drones.slice(0,6).map(d =>
+      `<tr>
+        <td class="mono" style="color:var(--accent);">${d.drone_id}</td>
+        <td class="mono">${d.serial_number}</td>
+        <td>${d.model}</td>
+        <td><span class="chip">${d.city || '—'}</span></td>
+        <td>${batteryBar(d.current_battery_pct)}</td>
+        <td>${statusBadge(d.status)}</td>
+      </tr>`
+    ).join('');
+
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+  } catch(err) {
+    document.getElementById('dash-orders').innerHTML =
+      `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:28px;font-family:var(--mono);font-size:12px;">❌ Cannot connect to server — make sure node server.js is running</td></tr>`;
+  }
+  icon.classList.remove('spinning');
+}
+
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>

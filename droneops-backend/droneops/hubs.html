@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — Hubs</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.field-err { color:var(--red); font-size:11px; font-family:var(--mono); margin-top:-12px; margin-bottom:10px; display:none; }
+.hub-pill { padding:5px 14px; border-radius:20px; font-family:var(--mono); font-size:11px; font-weight:700; border:1px solid; letter-spacing:.3px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <!-- HEADER -->
+      <div class="section-header">
+        <div class="section-title">Hub Network</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="search-bar" id="search" placeholder="Search hub name / city…" oninput="onSearch()"/>
+          <span id="add-hub-btn"></span>
+        </div>
+      </div>
+
+      <!-- SUMMARY PILLS -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;" id="hub-summary"></div>
+
+      <!-- STAT CARDS -->
+      <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px;">
+        <div class="stat-card accent">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <path d="M14 3L25 9V19L14 25L3 19V9L14 3Z" stroke="#00d4ff" stroke-width="1.5"/>
+              <circle cx="14" cy="14" r="3" fill="#00d4ff"/>
+              <line x1="14" y1="11" x2="14" y2="3" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+              <line x1="14" y1="17" x2="14" y2="25" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+              <line x1="11.4" y1="12.5" x2="4.5" y2="8.5" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+              <line x1="16.6" y1="15.5" x2="23.5" y2="19.5" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+              <line x1="16.6" y1="12.5" x2="23.5" y2="8.5" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+              <line x1="11.4" y1="15.5" x2="4.5" y2="19.5" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="stat-label">Total Hubs</div>
+          <div class="stat-value" id="s-total">—</div>
+          <div class="stat-sub" id="sub-total">Loading...</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <circle cx="14" cy="14" r="10" stroke="#00e676" stroke-width="1.5"/>
+              <polyline points="9,14 12.5,17.5 19,11" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-label">Active Hubs</div>
+          <div class="stat-value" id="s-active">—</div>
+          <div class="stat-sub" id="sub-active">Operational</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <rect x="10" y="11" width="8" height="6" rx="1.5" fill="#ffab40"/>
+              <ellipse cx="5" cy="9" rx="4" ry="1.8" stroke="#ffab40" stroke-width="1.5"/>
+              <ellipse cx="23" cy="9" rx="4" ry="1.8" stroke="#ffab40" stroke-width="1.5"/>
+              <ellipse cx="5" cy="19" rx="4" ry="1.8" stroke="#ffab40" stroke-width="1.5"/>
+              <ellipse cx="23" cy="19" rx="4" ry="1.8" stroke="#ffab40" stroke-width="1.5"/>
+              <line x1="10" y1="12.5" x2="5" y2="9" stroke="#ffab40" stroke-width="1.2"/>
+              <line x1="18" y1="12.5" x2="23" y2="9" stroke="#ffab40" stroke-width="1.2"/>
+              <line x1="10" y1="15.5" x2="5" y2="19" stroke="#ffab40" stroke-width="1.2"/>
+              <line x1="18" y1="15.5" x2="23" y2="19" stroke="#ffab40" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="stat-label">Total Drones</div>
+          <div class="stat-value" id="s-drones">—</div>
+          <div class="stat-sub" id="sub-drones">Across all hubs</div>
+        </div>
+        <div class="stat-card" style="border-color:rgba(179,136,255,.15);">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <rect x="4" y="8" width="20" height="14" rx="3" stroke="#b388ff" stroke-width="1.5"/>
+              <line x1="4" y1="13" x2="24" y2="13" stroke="#b388ff" stroke-width="1" opacity="0.5"/>
+              <line x1="14" y1="8" x2="14" y2="22" stroke="#b388ff" stroke-width="1" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="stat-label">Total Capacity</div>
+          <div class="stat-value" id="s-cap" style="color:var(--purple);">—</div>
+          <div class="stat-sub">Max drones</div>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="section-header">
+        <div class="section-title">All Hubs</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Hub ID</th><th>Name</th><th>City</th>
+              <th>Capacity</th><th>Drones</th><th>Available</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="hub-table">
+            <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:12px;">Loading...</td></tr>
+          </tbody>
+        </table>
+        <div class="pagination-bar" id="hub-pagination"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT HUB MODAL -->
+<div class="modal-overlay" id="hub-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="hub-modal-title">Add Hub</div>
+      <button class="modal-close" onclick="closeModal('hub-modal')">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group full">
+        <label class="form-label">Hub Name * <span style="color:var(--text3);font-size:9px;">(unique, max 120 chars)</span></label>
+        <input class="form-input" id="h-name" placeholder="Mumbai Central Hub" maxlength="120"/>
+        <div class="field-err" id="err-name">Hub name is required (max 120 characters)</div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Address * <span style="color:var(--text3);font-size:9px;">(max 300 chars)</span></label>
+        <input class="form-input" id="h-address" placeholder="1 Drone Park, Andheri" maxlength="300"/>
+        <div class="field-err" id="err-address">Address is required (max 300 characters)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">City * <span style="color:var(--text3);font-size:9px;">(max 100 chars)</span></label>
+        <input class="form-input" id="h-city" placeholder="Mumbai" maxlength="100"/>
+        <div class="field-err" id="err-city">City is required</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Drone Capacity * <span style="color:var(--text3);font-size:9px;">(&gt; 0)</span></label>
+        <input class="form-input" id="h-capacity" type="number" min="1" max="1000" placeholder="20"/>
+        <div class="field-err" id="err-capacity">Must be greater than 0</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Latitude * <span style="color:var(--text3);font-size:9px;">(-90 to 90)</span></label>
+        <input class="form-input" id="h-lat" type="number" step="0.000001" min="-90" max="90" placeholder="19.119660"/>
+        <div class="field-err" id="err-lat">Must be between -90 and 90</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Longitude * <span style="color:var(--text3);font-size:9px;">(-180 to 180)</span></label>
+        <input class="form-input" id="h-lng" type="number" step="0.000001" min="-180" max="180" placeholder="72.846010"/>
+        <div class="field-err" id="err-lng">Must be between -180 and 180</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contact Phone</label>
+        <input class="form-input" id="h-phone" placeholder="+912211112222" maxlength="20"/>
+        <div class="field-err" id="err-phone">Invalid phone format</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="h-status">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('hub-modal')">Cancel</button>
+      <button class="btn btn-primary" id="save-hub-btn" onclick="saveHub()">Save Hub</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="width:380px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--red);">Confirm Delete</div>
+      <button class="modal-close" onclick="closeModal('confirm-modal')">×</button>
+    </div>
+    <div class="confirm-msg" id="confirm-msg">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('confirm-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="execDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('hubs');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('Hubs');
+document.getElementById('add-hub-btn').innerHTML = can('hubs','create')
+  ? '<button class="btn btn-primary" onclick="openAdd()">+ Add Hub</button>'
+  : '<span style="font-family:var(--mono);font-size:11px;padding:6px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text3);">View only</span>';
+
+const PAGE_SIZE = 10;
+let allHubs   = [];
+let allDrones = [];
+let filtered  = [];
+let currentPage = 1;
+let editingId = null;
+let deleteId  = null;
+
+// ── LOAD DATA ──
+async function loadData() {
+  try {
+    [allHubs, allDrones] = await Promise.all([ GET('/hubs'), GET('/drones') ]);
+    filtered = [...allHubs];
+    renderStats();
+    renderSummary();
+    renderTable();
+  } catch(err) { toast('Failed to load hubs', 'error'); }
+}
+
+// ── STATS ──
+function renderStats() {
+  const active = allHubs.filter(h => h.is_active).length;
+  const totalDrones = allDrones.length;
+  const totalCap = allHubs.reduce((a,h) => a + (h.drone_capacity||0), 0);
+  document.getElementById('s-total').textContent  = allHubs.length;
+  document.getElementById('sub-total').textContent = `${allHubs.length - active} inactive`;
+  document.getElementById('s-active').textContent = active;
+  document.getElementById('sub-active').textContent = `${allHubs.length - active} offline`;
+  document.getElementById('s-drones').textContent = totalDrones;
+  document.getElementById('sub-drones').textContent = `Across ${allHubs.length} hubs`;
+  document.getElementById('s-cap').textContent = totalCap;
+}
+
+// ── SUMMARY PILLS ──
+function renderSummary() {
+  const cities = [...new Set(allHubs.map(h => h.city))];
+  const pills = [
+    { label:`${allHubs.filter(h=>h.is_active).length} Active`, color:'var(--green)', bg:'rgba(0,230,118,.08)', border:'rgba(0,230,118,.2)' },
+    { label:`${allHubs.filter(h=>!h.is_active).length} Inactive`, color:'var(--text2)', bg:'rgba(255,255,255,.04)', border:'rgba(255,255,255,.1)' },
+    { label:`${cities.length} Cities`, color:'var(--accent)', bg:'rgba(0,212,255,.06)', border:'rgba(0,212,255,.2)' },
+  ];
+  document.getElementById('hub-summary').innerHTML = pills.map(p =>
+    `<div style="padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px;font-weight:700;border:1px solid ${p.border};background:${p.bg};color:${p.color};">${p.label}</div>`
+  ).join('');
+}
+
+// ── SEARCH ──
+function onSearch() {
+  const q = document.getElementById('search').value.toLowerCase();
+  filtered = q
+    ? allHubs.filter(h => h.hub_name.toLowerCase().includes(q) || h.city.toLowerCase().includes(q) || String(h.hub_id).includes(q))
+    : [...allHubs];
+  currentPage = 1;
+  renderTable();
+}
+
+// ── RENDER TABLE ──
+function renderTable() {
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage-1) * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('hub-table').innerHTML = slice.length
+    ? slice.map(h => {
+        const hubDrones = allDrones.filter(d => d.hub_id === h.hub_id);
+        const available = hubDrones.filter(d => d.status === 'available').length;
+        const pct = h.drone_capacity > 0 ? Math.round((hubDrones.length / h.drone_capacity) * 100) : 0;
+        const barColor = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--amber)' : 'var(--green)';
+        return `<tr>
+          <td class="mono" style="color:var(--accent);font-weight:700;">${h.hub_id}</td>
+          <td><b>${h.hub_name}</b></td>
+          <td><span class="chip">${h.city}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="bar-wrap" style="width:60px;">
+                <div class="bar-fill" style="width:${pct}%;background:${barColor};"></div>
+              </div>
+              <span class="mono" style="font-size:11px;">${hubDrones.length}/${h.drone_capacity}</span>
+            </div>
+          </td>
+          <td><span class="badge ${hubDrones.length > 0 ? 'badge-blue' : 'badge-gray'}">${hubDrones.length} drones</span></td>
+          <td><span class="badge ${available > 0 ? 'badge-green' : 'badge-amber'}">${available} ready</span></td>
+          <td>${statusBadge(h.is_active ? 'available' : 'retired')}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              ${can('hubs','update') ? `<button class="btn btn-warn btn-sm" onclick="openEdit(${h.hub_id})">Edit</button>` : ''}
+              ${can('hubs','delete') ? `<button class="btn btn-danger btn-sm" onclick="askDelete(${h.hub_id},'${h.hub_name}')">Delete</button>` : ''}
+              ${!can('hubs','update') && !can('hubs','delete') ? '<span style="color:var(--text3);font-size:11px;font-family:var(--mono);">View only</span>' : ''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="8"><div class="empty"><div class="empty-text">No hubs found.</div></div></td></tr>`;
+
+  renderPagination(total, totalPages);
+}
+
+// ── PAGINATION ──
+function renderPagination(total, totalPages) {
+  const el = document.getElementById('hub-pagination');
+  if (total === 0) { el.innerHTML=''; return; }
+  const start = (currentPage-1)*PAGE_SIZE+1;
+  const end   = Math.min(currentPage*PAGE_SIZE, total);
+  let pages = [];
+  for (let i=1; i<=totalPages; i++) {
+    if (i===1 || i===totalPages || (i>=currentPage-2 && i<=currentPage+2)) pages.push(i);
+    else if (pages[pages.length-1] !== '…') pages.push('…');
+  }
+  const btns = pages.map(p => p==='…'
+    ? `<span class="pg-dots">…</span>`
+    : `<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+  ).join('');
+  el.innerHTML = `
+    <div class="pagination-info">Showing <b>${start}–${end}</b> of <b>${total}</b> hubs</div>
+    <div class="pagination-controls">
+      <button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+      ${btns}
+      <button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
+    </div>`;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  if (p<1||p>totalPages) return;
+  currentPage = p;
+  renderTable();
+  document.querySelector('.table-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── VALIDATION ──
+function validateHubForm() {
+  let ok = true;
+  const checks = [
+    { id:'h-name',     err:'err-name',     fn: v => v.length>0 && v.length<=120 },
+    { id:'h-address',  err:'err-address',  fn: v => v.length>0 && v.length<=300 },
+    { id:'h-city',     err:'err-city',     fn: v => v.length>0 && v.length<=100 },
+    { id:'h-capacity', err:'err-capacity', fn: v => parseInt(v) > 0 },
+    { id:'h-lat',      err:'err-lat',      fn: v => { const n=parseFloat(v); return !isNaN(n) && n>=-90 && n<=90; } },
+    { id:'h-lng',      err:'err-lng',      fn: v => { const n=parseFloat(v); return !isNaN(n) && n>=-180 && n<=180; } },
+  ];
+  checks.forEach(c => {
+    const val = document.getElementById(c.id).value.trim();
+    const errEl = document.getElementById(c.err);
+    if (!c.fn(val)) {
+      errEl.style.display='block'; ok=false;
+      document.getElementById(c.id).style.borderColor='var(--red)';
+    } else {
+      errEl.style.display='none';
+      document.getElementById(c.id).style.borderColor='';
+    }
+  });
+  // Phone optional but validate format if provided
+  const phone = document.getElementById('h-phone').value.trim();
+  const phoneErr = document.getElementById('err-phone');
+  if (phone && !/^\+?[0-9]{7,20}$/.test(phone)) {
+    phoneErr.style.display='block'; ok=false;
+    document.getElementById('h-phone').style.borderColor='var(--red)';
+  } else { phoneErr.style.display='none'; document.getElementById('h-phone').style.borderColor=''; }
+  return ok;
+}
+
+// ── OPEN MODALS ──
+function openAdd() {
+  editingId = null;
+  document.getElementById('hub-modal-title').textContent = 'Add Hub';
+  ['h-name','h-address','h-city','h-capacity','h-lat','h-lng','h-phone'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('h-status').value = 'true';
+  clearErrors();
+  openModal('hub-modal');
+}
+function openEdit(id) {
+  editingId = id;
+  const h = allHubs.find(x => x.hub_id === id);
+  document.getElementById('hub-modal-title').textContent = `Edit Hub #${id}`;
+  document.getElementById('h-name').value     = h.hub_name;
+  document.getElementById('h-address').value  = h.address;
+  document.getElementById('h-city').value     = h.city;
+  document.getElementById('h-capacity').value = h.drone_capacity;
+  document.getElementById('h-lat').value      = h.latitude;
+  document.getElementById('h-lng').value      = h.longitude;
+  document.getElementById('h-phone').value    = h.contact_phone || '';
+  document.getElementById('h-status').value   = h.is_active ? 'true' : 'false';
+  clearErrors();
+  openModal('hub-modal');
+}
+function clearErrors() {
+  ['err-name','err-address','err-city','err-capacity','err-lat','err-lng','err-phone'].forEach(id => {
+    document.getElementById(id).style.display='none';
+  });
+}
+
+// ── SAVE ──
+async function saveHub() {
+  if (!validateHubForm()) return;
+  const body = {
+    hub_name:       document.getElementById('h-name').value.trim(),
+    address:        document.getElementById('h-address').value.trim(),
+    city:           document.getElementById('h-city').value.trim(),
+    drone_capacity: parseInt(document.getElementById('h-capacity').value),
+    latitude:       parseFloat(document.getElementById('h-lat').value),
+    longitude:      parseFloat(document.getElementById('h-lng').value),
+    contact_phone:  document.getElementById('h-phone').value.trim() || null,
+    is_active:      document.getElementById('h-status').value === 'true',
+  };
+  const btn = document.getElementById('save-hub-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    if (editingId) {
+      await PUT(`/hubs/${editingId}`, body);
+      toast(`Hub #${editingId} updated`, 'success');
+    } else {
+      await POST('/hubs', body);
+      toast('Hub added to network', 'success');
+    }
+    closeModal('hub-modal');
+    await loadData();
+  } catch(err) {}
+  btn.disabled=false; btn.textContent='Save Hub';
+}
+
+// ── DELETE ──
+function askDelete(id, label) {
+  deleteId = id;
+  document.getElementById('confirm-msg').innerHTML =
+    `Delete hub <b style="color:var(--text)">${label}</b>?<br><span style="font-size:12px;color:var(--text3);">All drones at this hub will be unlinked.</span>`;
+  openModal('confirm-modal');
+}
+async function execDelete() {
+  try {
+    await DEL(`/hubs/${deleteId}`);
+    toast('Hub removed', 'info');
+    closeModal('confirm-modal');
+    await loadData();
+  } catch(err) {}
+}
+
+// ── INIT ──
+loadData();
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); })
+);
+document.querySelectorAll('.form-input').forEach(el =>
+  el.addEventListener('input', () => el.style.borderColor='')
+);
+</script>
+</body>
+</html>

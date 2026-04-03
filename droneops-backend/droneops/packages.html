@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="shortcut icon" href="favicon.svg"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DroneOps — Packages</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.cat-pill {
+  padding:5px 14px; border-radius:20px; font-family:var(--mono);
+  font-size:11px; font-weight:700; border:1px solid; letter-spacing:.3px;
+  cursor:pointer; background:transparent; transition:all .15s ease;
+}
+.cat-pill.active-cat { box-shadow:0 0 10px rgba(0,212,255,.2); }
+.fragile-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:4px; font-size:11px;
+  font-family:var(--mono); font-weight:700;
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div id="sidebar-mount"></div>
+  <div class="main">
+    <div id="topbar-mount"></div>
+    <div class="page-content">
+
+      <!-- HEADER -->
+      <div class="section-header">
+        <div class="section-title">Packages</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input class="search-bar" id="search" placeholder="Search tracking / description…" oninput="onSearch()"/>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- STAT CARDS -->
+      <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+
+        <div class="stat-card accent">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <path d="M14 3L24 8V20L14 25L4 20V8L14 3Z" stroke="#00d4ff" stroke-width="1.5"/>
+              <line x1="14" y1="3" x2="14" y2="25" stroke="#00d4ff" stroke-width="1" opacity="0.4"/>
+              <line x1="4" y1="8" x2="24" y2="8" stroke="#00d4ff" stroke-width="1" opacity="0.4"/>
+              <path d="M9 5.5 L14 3 L19 5.5" stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-label">Total Packages</div>
+          <div class="stat-value" id="s-total">—</div>
+          <div class="stat-sub" id="sub-total">Loading…</div>
+        </div>
+
+        <div class="stat-card red">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <path d="M14 4L26 22H2L14 4Z" stroke="#ff5252" stroke-width="1.5" stroke-linejoin="round"/>
+              <line x1="14" y1="11" x2="14" y2="16" stroke="#ff5252" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="14" cy="19" r="1.2" fill="#ff5252"/>
+            </svg>
+          </div>
+          <div class="stat-label">Fragile</div>
+          <div class="stat-value" id="s-fragile">—</div>
+          <div class="stat-sub">Handle with care</div>
+        </div>
+
+        <div class="stat-card amber">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <circle cx="14" cy="14" r="10" stroke="#ffab40" stroke-width="1.5"/>
+              <polyline points="14,8 14,14 18,17" stroke="#ffab40" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-label">In Transit</div>
+          <div class="stat-value" id="s-transit">—</div>
+          <div class="stat-sub">Dispatched or in-flight</div>
+        </div>
+
+        <div class="stat-card green">
+          <div class="stat-icon">
+            <svg width="52" height="52" viewBox="0 0 28 28" fill="none">
+              <circle cx="14" cy="14" r="10" stroke="#00e676" stroke-width="1.5"/>
+              <polyline points="9,14 12.5,17.5 19,11" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-label">Delivered</div>
+          <div class="stat-value" id="s-delivered">—</div>
+          <div class="stat-sub">Successfully delivered</div>
+        </div>
+
+      </div>
+
+      <!-- CATEGORY FILTER PILLS -->
+      <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;" id="cat-pills"></div>
+
+      <!-- TABLE -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pkg ID</th><th>Order</th><th>Description</th>
+              <th>Weight</th><th>Dimensions</th><th>Category</th>
+              <th>Fragile</th><th>Tracking #</th><th>Order Status</th>
+            </tr>
+          </thead>
+          <tbody id="pkg-table">
+            <tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:12px;">Loading...</td></tr>
+          </tbody>
+        </table>
+        <div class="pagination-bar" id="pkg-pagination"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+document.getElementById('sidebar-mount').innerHTML = buildSidebar('packages');
+document.getElementById('topbar-mount').innerHTML  = buildTopbar('Packages');
+
+const PAGE_SIZE = 10;
+const CATEGORIES = ['electronics','food','medicine','clothing','documents','household','other'];
+const CAT_COLORS = {
+  electronics:'rgba(0,212,255,.08)|rgba(0,212,255,.2)|var(--accent)',
+  food:       'rgba(0,230,118,.08)|rgba(0,230,118,.2)|var(--green)',
+  medicine:   'rgba(255,82,82,.08)|rgba(255,82,82,.2)|var(--red)',
+  clothing:   'rgba(179,136,255,.08)|rgba(179,136,255,.2)|var(--purple)',
+  documents:  'rgba(255,171,64,.08)|rgba(255,171,64,.2)|var(--amber)',
+  household:  'rgba(255,255,255,.04)|rgba(255,255,255,.1)|var(--text2)',
+  other:      'rgba(255,255,255,.04)|rgba(255,255,255,.1)|var(--text2)',
+};
+
+let allPackages = [];
+let allOrders   = [];
+let filtered    = [];
+let currentPage = 1;
+let activeCategory = '';
+
+// ── LOAD ──
+async function loadData() {
+  try {
+    [allPackages, allOrders] = await Promise.all([ GET('/packages'), GET('/orders') ]);
+    filtered = [...allPackages];
+    renderStats();
+    renderCatPills();
+    renderTable();
+    logSQL(`SELECT p.*, o.status AS order_status, o.customer_id\nFROM package p\nJOIN "order" o ON o.order_id = p.order_id\nORDER BY p.created_at DESC;`);
+  } catch(err) { toast('Failed to load packages','error'); }
+}
+
+// ── STATS ──
+function renderStats() {
+  const transit = allPackages.filter(p => {
+    const o = allOrders.find(x => x.order_id === p.order_id);
+    return o && ['dispatched','in-transit'].includes(o.status);
+  }).length;
+  const delivered = allPackages.filter(p => {
+    const o = allOrders.find(x => x.order_id === p.order_id);
+    return o && o.status === 'delivered';
+  }).length;
+  document.getElementById('s-total').textContent    = allPackages.length;
+  document.getElementById('sub-total').textContent  = `across ${new Set(allPackages.map(p=>p.order_id)).size} orders`;
+  document.getElementById('s-fragile').textContent  = allPackages.filter(p=>p.is_fragile).length;
+  document.getElementById('s-transit').textContent  = transit;
+  document.getElementById('s-delivered').textContent = delivered;
+}
+
+// ── CATEGORY PILLS ──
+function renderCatPills() {
+  document.getElementById('cat-pills').innerHTML =
+    `<button class="cat-pill ${activeCategory===''?'active-cat':''}"
+      style="color:var(--text2);background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1);"
+      onclick="filterCat('')">All (${allPackages.length})</button>` +
+    CATEGORIES.map(cat => {
+      const count = allPackages.filter(p=>p.category===cat).length;
+      if (count===0) return '';
+      const [bg,border,color] = CAT_COLORS[cat].split('|');
+      const isActive = activeCategory === cat;
+      return `<button class="cat-pill ${isActive?'active-cat':''}"
+        style="color:${color};background:${bg};border-color:${border};"
+        onclick="filterCat('${cat}')">${cat}: ${count}</button>`;
+    }).join('');
+}
+
+function filterCat(cat) {
+  activeCategory = cat;
+  onSearch();
+}
+
+// ── SEARCH ──
+function onSearch() {
+  const q = document.getElementById('search').value.toLowerCase();
+  filtered = allPackages.filter(p => {
+    const matchQ   = !q || (p.description||'').toLowerCase().includes(q) || (p.tracking_number||'').toLowerCase().includes(q) || String(p.package_id).includes(q);
+    const matchCat = !activeCategory || p.category === activeCategory;
+    return matchQ && matchCat;
+  });
+  currentPage = 1;
+  renderCatPills();
+  renderTable();
+}
+
+// ── RENDER TABLE ──
+function renderTable() {
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage-1)*PAGE_SIZE;
+  const slice = filtered.slice(start, start+PAGE_SIZE);
+
+  document.getElementById('pkg-table').innerHTML = slice.length
+    ? slice.map(p => {
+        const o = allOrders.find(x => x.order_id === p.order_id);
+        const [bg,border,color] = (CAT_COLORS[p.category]||CAT_COLORS.other).split('|');
+        return `<tr>
+          <td class="mono" style="color:var(--accent);font-weight:700;">${p.package_id}</td>
+          <td class="mono" style="color:var(--text2);">#${p.order_id}</td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.description||''}">${p.description||'—'}</td>
+          <td class="mono">${p.weight_kg} kg</td>
+          <td class="mono" style="color:var(--text3);font-size:11px;">${p.length_cm}×${p.width_cm}×${p.height_cm}</td>
+          <td><span style="padding:2px 9px;border-radius:5px;font-size:10px;font-family:var(--mono);font-weight:700;background:${bg};border:1px solid ${border};color:${color};">${p.category||'—'}</span></td>
+          <td>
+            ${p.is_fragile
+              ? `<span class="fragile-badge" style="background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);color:var(--red);">⚠ Fragile</span>`
+              : `<span style="color:var(--text3);font-size:12px;font-family:var(--mono);">—</span>`}
+          </td>
+          <td class="mono" style="font-size:11px;color:var(--text2);">${p.tracking_number||'—'}</td>
+          <td>${o ? statusBadge(o.status) : '<span style="color:var(--text3);">—</span>'}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="9"><div class="empty"><div class="empty-text">No packages match your filter.</div></div></td></tr>`;
+
+  renderPagination(total, totalPages);
+}
+
+// ── PAGINATION ──
+function renderPagination(total, totalPages) {
+  const el = document.getElementById('pkg-pagination');
+  if (total===0){el.innerHTML='';return;}
+  const start=(currentPage-1)*PAGE_SIZE+1;
+  const end=Math.min(currentPage*PAGE_SIZE,total);
+  let pages=[];
+  for(let i=1;i<=totalPages;i++){
+    if(i===1||i===totalPages||(i>=currentPage-2&&i<=currentPage+2)) pages.push(i);
+    else if(pages[pages.length-1]!=='…') pages.push('…');
+  }
+  const btns=pages.map(p=>p==='…'
+    ?`<span class="pg-dots">…</span>`
+    :`<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+  ).join('');
+  el.innerHTML=`
+    <div class="pagination-info">Showing <b>${start}–${end}</b> of <b>${total}</b> packages</div>
+    <div class="pagination-controls">
+      <button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+      ${btns}
+      <button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>
+    </div>`;
+}
+function goPage(p){
+  const tp=Math.ceil(filtered.length/PAGE_SIZE);
+  if(p<1||p>tp)return;
+  currentPage=p;
+  renderTable();
+  document.querySelector('.table-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+loadData();
+</script>
+</body>
+</html>
